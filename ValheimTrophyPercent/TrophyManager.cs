@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 
 namespace ValheimTrophyPercent
@@ -16,6 +17,32 @@ namespace ValheimTrophyPercent
         // caches to map "TrophyBoar" -> "Boar" and its drop chance (e.g. 0.15)
         public static Dictionary<string, string> TrophyToEnemy = new Dictionary<string, string>();
         public static Dictionary<string, float> TrophyDropChances = new Dictionary<string, float>();
+
+        // New cached sprites for our native checkbox look
+        public static Sprite CheckboxBackground;
+        public static Sprite Checkmark;
+
+        // Searches memory for an authentic Valheim checkbox and steals its sprites
+        public static void LoadToggleSprites()
+        {
+            if (CheckboxBackground != null && Checkmark != null) return;
+            
+            Toggle[] toggles = Resources.FindObjectsOfTypeAll<Toggle>();
+            foreach (Toggle t in toggles)
+            {
+                if (t.targetGraphic != null && t.graphic != null)
+                {
+                    Image bg = t.targetGraphic as Image;
+                    Image check = t.graphic as Image;
+                    if (bg != null && check != null && bg.sprite != null && check.sprite != null)
+                    {
+                        CheckboxBackground = bg.sprite;
+                        Checkmark = check.sprite;
+                        return;
+                    }
+                }
+            }
+        }
 
         public static void LoadConfig(string configStr)
         {

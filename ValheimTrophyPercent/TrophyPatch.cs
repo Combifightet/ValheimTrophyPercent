@@ -13,7 +13,10 @@ namespace ValheimTrophyPercent
         {
             if (Player.m_localPlayer == null || ___m_trophieElementPrefab == null) return;
 
+            // Gather Valheim's internal data and sprites
+            TrophyManager.LoadToggleSprites();
             TrophyManager.CacheEnemyData();
+
             List<string> collected = Player.m_localPlayer.GetTrophies();
             int total = TrophyManager.GetTotalTrophies();
             
@@ -25,7 +28,7 @@ namespace ValheimTrophyPercent
             {
                 GameObject uiElement = ___m_trophyList[i];
                 string trophyPrefabName = collected[i];
-                AddPinButtonToElement(uiElement, ___m_trophieElementPrefab, trophyPrefabName);
+                AddPinButtonToElement(uiElement, trophyPrefabName);
             }
 
             // 3. Add "Killed but Missing" Trophies
@@ -63,7 +66,7 @@ namespace ValheimTrophyPercent
                 ___m_trophyList.Add(gameObject);
 
 				// Add pin button to missing trophies as well
-                AddPinButtonToElement(gameObject, ___m_trophieElementPrefab, missingTrophy);
+                AddPinButtonToElement(gameObject, missingTrophy);
             }
 
             // Resize the container to fit the newly added elements
@@ -93,7 +96,7 @@ namespace ValheimTrophyPercent
             text.alignment = TextAlignmentOptions.TopLeft;
         }
 
-        private static void AddPinButtonToElement(GameObject uiElement, GameObject templatePrefab, string trophyPrefabName)
+        private static void AddPinButtonToElement(GameObject uiElement, string trophyPrefabName)
         {
             // create a small UI Button in the corner of the trophy element
             GameObject btnObj = new GameObject("PinButton");
@@ -102,30 +105,45 @@ namespace ValheimTrophyPercent
             RectTransform btnRect = btnObj.AddComponent<RectTransform>();
             btnRect.anchorMin = new Vector2(1, 1);
             btnRect.anchorMax = new Vector2(1, 1);
-            btnRect.anchoredPosition = new Vector2(-15, -15);
-            btnRect.sizeDelta = new Vector2(30, 30);
+            btnRect.anchoredPosition = new Vector2(-22, -22); // Shifted slightly for a 28x28 box
+            btnRect.sizeDelta = new Vector2(28, 28); // Valheim checkboxes are typically 28x28
 
-            Image img = btnObj.AddComponent<Image>();
-            img.color = TrophyManager.PinnedTrophies.Contains(trophyPrefabName) ? Color.green : Color.gray;
+            // 1. The Background Box
+            Image bgImg = btnObj.AddComponent<Image>();
+            if (TrophyManager.CheckboxBackground != null) bgImg.sprite = TrophyManager.CheckboxBackground;
+            else bgImg.color = new Color(0, 0, 0, 0.5f); // Safe fallback if search fails
 
+            // Make the button interactable
             Button btn = btnObj.AddComponent<Button>();
+            btn.targetGraphic = bgImg; // Allows Valheim's standard hover-tinting to work
+
+            // 2. The Checkmark 
+            GameObject checkObj = new GameObject("Checkmark");
+            checkObj.transform.SetParent(btnObj.transform, false);
+            RectTransform checkRect = checkObj.AddComponent<RectTransform>();
+            checkRect.anchorMin = Vector2.zero;
+            checkRect.anchorMax = Vector2.one;
+            checkRect.sizeDelta = Vector2.zero; // Stretches to fill parent
+            checkRect.anchoredPosition = Vector2.zero;
+            
+            Image checkImg = checkObj.AddComponent<Image>();
+            if (TrophyManager.Checkmark != null) checkImg.sprite = TrophyManager.Checkmark;
+            else checkImg.color = Color.green; // Safe fallback
+
+            // Set initial state
+            checkImg.enabled = TrophyManager.PinnedTrophies.Contains(trophyPrefabName);
+
+            // Toggle state on click
             btn.onClick.AddListener(() => 
             {
                 TrophyManager.TogglePin(trophyPrefabName);
-                // update button color visually immediately
-                img.color = TrophyManager.PinnedTrophies.Contains(trophyPrefabName) ? Color.green : Color.gray;
+                checkImg.enabled = TrophyManager.PinnedTrophies.Contains(trophyPrefabName);
             });
 
-            // clone text object to prevent warnings
-            GameObject templateText = templatePrefab.transform.Find("name").gameObject;
-            GameObject textObj = UnityEngine.Object.Instantiate(templateText, btnObj.transform);
-            textObj.name = "Text";
-            
-            TMP_Text txt = textObj.GetComponent<TMP_Text>();
-            txt.text = "*"; 
-            txt.color = Color.white;
-            txt.alignment = TextAlignmentOptions.Center;
-            txt.GetComponent<RectTransform>().anchoredPosition = Vector2.zero;
+            // 3. Add Valheim's Native Hover Tooltip
+            UITooltip tooltip = btnObj.AddComponent<UITooltip>();
+            tooltip.m_topic = "Track Trophy";
+            tooltip.m_text = "Pin this trophy's progress to your HUD.";
         }
     }
 }
