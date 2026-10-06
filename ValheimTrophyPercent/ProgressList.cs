@@ -111,15 +111,18 @@ namespace ValheimTrophyPercent
             rowLayout.childForceExpandWidth = false;
             rowLayout.childForceExpandHeight = false;
 
-            string enemyKey = "";
-            float dropChance = 1f;
-            if (TrophyManager.TrophyToEnemy.TryGetValue(trophyPrefab, out string en)) enemyKey = en;
-            if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc)) dropChance = dc;
+            // Pull Valheim's exact remaining kills from the live pity timer 
+            int remaining = 1;
+            if (CharacterDrop.s_pseudoCounter != null && CharacterDrop.s_pseudoCounter.TryGetValue(trophyPrefab, out var tuple))
+            {
+                remaining = tuple.Item2;
+            }
+            else if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc))
+            {
+                remaining = Mathf.RoundToInt(1f / dc); // Fallback if no kills have happened yet this session
+            }
 
-            int kills = string.IsNullOrEmpty(enemyKey) ? 0 : TrophyManager.GetKillCount(enemyKey);
-            int expected = dropChance > 0 ? Mathf.RoundToInt(1f / dropChance) : 1;
-            
-            string displayText = $"{kills} / {expected} {localizedName}";
+            string displayText = $"{remaining} Left - {localizedName}";
 
             GameObject textObj = UnityEngine.Object.Instantiate(Hud.instance.m_hoverName.gameObject, row.transform);
             textObj.name = "Text";

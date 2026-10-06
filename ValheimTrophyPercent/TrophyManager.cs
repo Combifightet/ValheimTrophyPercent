@@ -21,24 +21,40 @@ namespace ValheimTrophyPercent
         // New cached sprites for our native checkbox look
         public static Sprite CheckboxBackground;
         public static Sprite Checkmark;
+        public static GameObject DefaultTooltipPrefab;
 
         // Searches memory for an authentic Valheim checkbox and steals its sprites
         public static void LoadToggleSprites()
         {
-            if (CheckboxBackground != null && Checkmark != null) return;
-            
-            Toggle[] toggles = Resources.FindObjectsOfTypeAll<Toggle>();
-            foreach (Toggle t in toggles)
+            if (CheckboxBackground == null || Checkmark == null)
             {
-                if (t.targetGraphic != null && t.graphic != null)
+                Toggle[] toggles = Resources.FindObjectsOfTypeAll<Toggle>();
+                foreach (Toggle t in toggles)
                 {
-                    Image bg = t.targetGraphic as Image;
-                    Image check = t.graphic as Image;
-                    if (bg != null && check != null && bg.sprite != null && check.sprite != null)
+                    if (t.targetGraphic != null && t.graphic != null)
                     {
-                        CheckboxBackground = bg.sprite;
-                        Checkmark = check.sprite;
-                        return;
+                        Image bg = t.targetGraphic as Image;
+                        Image check = t.graphic as Image;
+                        if (bg != null && check != null && bg.sprite != null && check.sprite != null)
+                        {
+                            CheckboxBackground = bg.sprite;
+                            Checkmark = check.sprite;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Grab the native Tooltip Prefab to prevent hover crashes
+            if (DefaultTooltipPrefab == null)
+            {
+                UITooltip[] tooltips = Resources.FindObjectsOfTypeAll<UITooltip>();
+                foreach (UITooltip t in tooltips)
+                {
+                    if (t.m_tooltipPrefab != null)
+                    {
+                        DefaultTooltipPrefab = t.m_tooltipPrefab;
+                        break;
                     }
                 }
             }

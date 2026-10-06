@@ -111,11 +111,11 @@ namespace ValheimTrophyPercent
             // 1. The Background Box
             Image bgImg = btnObj.AddComponent<Image>();
             if (TrophyManager.CheckboxBackground != null) bgImg.sprite = TrophyManager.CheckboxBackground;
-            else bgImg.color = new Color(0, 0, 0, 0.5f); // Safe fallback if search fails
+            else bgImg.color = new Color(0, 0, 0, 0.5f); 
 
             // Make the button interactable
             Button btn = btnObj.AddComponent<Button>();
-            btn.targetGraphic = bgImg; // Allows Valheim's standard hover-tinting to work
+            btn.targetGraphic = bgImg;
 
             // 2. The Checkmark 
             GameObject checkObj = new GameObject("Checkmark");
@@ -123,14 +123,14 @@ namespace ValheimTrophyPercent
             RectTransform checkRect = checkObj.AddComponent<RectTransform>();
             checkRect.anchorMin = Vector2.zero;
             checkRect.anchorMax = Vector2.one;
-            checkRect.sizeDelta = Vector2.zero; // Stretches to fill parent
+            checkRect.sizeDelta = Vector2.zero; 
             checkRect.anchoredPosition = Vector2.zero;
             
             Image checkImg = checkObj.AddComponent<Image>();
             if (TrophyManager.Checkmark != null) checkImg.sprite = TrophyManager.Checkmark;
-            else checkImg.color = Color.green; // Safe fallback
-
-            // Set initial state
+            
+            // Set a nice bronze/gold color for the checkmark
+            checkImg.color = new Color(0.8f, 0.5f, 0.2f, 1f); 
             checkImg.enabled = TrophyManager.PinnedTrophies.Contains(trophyPrefabName);
 
             // Toggle state on click
@@ -144,6 +144,10 @@ namespace ValheimTrophyPercent
             UITooltip tooltip = btnObj.AddComponent<UITooltip>();
             tooltip.m_topic = "Track Trophy";
             tooltip.m_text = "Pin this trophy's progress to your HUD.";
+            if (TrophyManager.DefaultTooltipPrefab != null)
+            {
+                tooltip.m_tooltipPrefab = TrophyManager.DefaultTooltipPrefab;
+            }
         }
     }
 }
