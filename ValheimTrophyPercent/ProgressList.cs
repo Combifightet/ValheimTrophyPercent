@@ -29,17 +29,18 @@ namespace ValheimTrophyPercent
                 
                 // Offset down by 250 pixels (below the minimap's default footprint) and 20 pixels left
                 Container.anchoredPosition = new Vector2(-30, -260);
-                Container.sizeDelta = new Vector2(250, 0); // Allow it to shrink to fit
+                Container.sizeDelta = new Vector2(250, 0); // Allow it to shrink
 
                 VerticalLayoutGroup layout = PinnedPanel.AddComponent<VerticalLayoutGroup>();
                 layout.childAlignment = TextAnchor.UpperRight;
                 layout.spacing = 2f;
-                // stop the layout from spreading elements across the screen
+                // Stop the layout from spreading elements across the screen
                 layout.childControlHeight = true;
                 layout.childControlWidth = true;
                 layout.childForceExpandHeight = false; 
                 layout.childForceExpandWidth = false;
 
+                // Add size fitter so the list tightens up based on rows
                 ContentSizeFitter fitter = PinnedPanel.AddComponent<ContentSizeFitter>();
                 fitter.verticalFit = ContentSizeFitter.FitMode.MinSize;
 
@@ -68,7 +69,10 @@ namespace ValheimTrophyPercent
         public static void UpdatePinnedUI()
         {
             if (PinnedPanel == null || ObjectDB.instance == null || Hud.instance == null) return;
-            TrophyManager.CacheEnemyData(); // Ensure we have the drop chances loaded
+            
+            TrophyManager.CacheEnemyData();
+            // Don't generate UI if cache isn't ready (prevents 0/1 bug when loading into world)
+            if (TrophyManager.TrophyToEnemy.Count == 0) return;
 
             foreach (Transform child in PinnedPanel.transform)
             {
@@ -107,21 +111,16 @@ namespace ValheimTrophyPercent
             rowLayout.childForceExpandWidth = false;
             rowLayout.childForceExpandHeight = false;
 
-            // read Valheim's internal pity timer to see exactly how many kills are remaining
-            int remaining = 1;
-            if (CharacterDrop.s_pseudoCounter != null && CharacterDrop.s_pseudoCounter.TryGetValue(trophyPrefab, out var tuple))
-            {
-                remaining = tuple.Item2;
-            }
-            else if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc))
-            {
-                remaining = Mathf.RoundToInt(1f / dc);
-            }
+            string enemyKey = "";
+            float dropChance = 1f;
+            if (TrophyManager.TrophyToEnemy.TryGetValue(trophyPrefab, out string en)) enemyKey = en;
+            if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc)) dropChance = dc;
 
-            // format as "5 Left - Neck" since the game only tracks remaining, not the starting goal
-            string displayText = $"{remaining} Left - {localizedName}";
+            int kills = string.IsNullOrEmpty(enemyKey) ? 0 : TrophyManager.GetKillCount(enemyKey);
+            int expected = dropChance > 0 ? Mathf.RoundToInt(1f / dropChance) : 1;
+            
+            string displayText = $"{kills} / {expected} {localizedName}";
 
-            // clone the HUD's hover name to guarantee a warning-free Font Asset
             GameObject textObj = UnityEngine.Object.Instantiate(Hud.instance.m_hoverName.gameObject, row.transform);
             textObj.name = "Text";
             

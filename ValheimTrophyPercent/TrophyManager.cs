@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 namespace ValheimTrophyPercent
 {
@@ -11,10 +11,42 @@ namespace ValheimTrophyPercent
 
         // Caches the total number of trophies in the game
         public static int TotalTrophiesInGame = -1;
+        public static TMP_FontAsset ValheimFont;
 
         // caches to map "TrophyBoar" -> "Boar" and its drop chance (e.g. 0.15)
         public static Dictionary<string, string> TrophyToEnemy = new Dictionary<string, string>();
         public static Dictionary<string, float> TrophyDropChances = new Dictionary<string, float>();
+
+        public static void LoadConfig(string configStr)
+        {
+            PinnedTrophies.Clear();
+            if (!string.IsNullOrEmpty(configStr))
+            {
+                string[] parts = configStr.Split(',');
+                foreach (string p in parts)
+                {
+                    if (!string.IsNullOrEmpty(p)) PinnedTrophies.Add(p);
+                }
+            }
+        }
+
+        public static TMP_FontAsset GetValheimFont()
+        {
+            if (ValheimFont == null)
+            {
+                TMP_FontAsset[] fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+                foreach (TMP_FontAsset font in fonts)
+                {
+                    if (font.name == "AveriaSerifLibre-Bold" || font.name == "AveriaSerifLibre-Light")
+                    {
+                        ValheimFont = font;
+                        return ValheimFont;
+                    }
+                }
+                if (fonts.Length > 0) ValheimFont = fonts[0];
+            }
+            return ValheimFont;
+        }
 
         public static void TogglePin(string trophyPrefabName)
         {
@@ -23,6 +55,8 @@ namespace ValheimTrophyPercent
             else
                 PinnedTrophies.Add(trophyPrefabName);
             
+            // Save immediately whenever the user clicks the checkbox
+            ValheimMod.Instance.SavePinnedConfig();
             ProgressList.UpdatePinnedUI();
         }
 
