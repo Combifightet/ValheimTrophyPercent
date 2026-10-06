@@ -29,8 +29,8 @@ namespace ValheimTrophyPercent
                 Container.pivot = new Vector2(1, 1);
                 
                 // Offset down by 250 pixels (below the minimap's default footprint) and 20 pixels left
-                Container.anchoredPosition = new Vector2(-20, -250);
-                Container.sizeDelta = new Vector2(200, 400);
+                Container.anchoredPosition = new Vector2(-30, -260);
+                Container.sizeDelta = new Vector2(250, 400);
 
                 VerticalLayoutGroup layout = PinnedPanel.AddComponent<VerticalLayoutGroup>();
                 layout.childAlignment = TextAnchor.UpperRight;
@@ -44,7 +44,6 @@ namespace ValheimTrophyPercent
         {
             if (PinnedPanel == null || ObjectDB.instance == null) return;
 
-            // Use UnityEngine.Object to avoid ambiguity with System.Object
             foreach (Transform child in PinnedPanel.transform)
             {
                 UnityEngine.Object.Destroy(child.gameObject);
@@ -59,31 +58,42 @@ namespace ValheimTrophyPercent
                 string localizedName = Localization.instance.Localize(itemDrop.m_itemData.m_shared.m_name);
                 Sprite icon = itemDrop.m_itemData.GetIcon();
 
-                CreateRow(localizedName, icon);
+                CreateRow(trophyPrefab, localizedName, icon);
             }
         }
 
-        private static void CreateRow(string name, Sprite icon)
+        private static void CreateRow(string trophyPrefab, string localizedName, Sprite icon)
         {
             GameObject row = new GameObject("PinnedRow");
             row.transform.SetParent(PinnedPanel.transform, false);
             RectTransform rowRect = row.AddComponent<RectTransform>();
-            rowRect.sizeDelta = new Vector2(200, 30);
+            rowRect.sizeDelta = new Vector2(250, 30);
             
             HorizontalLayoutGroup rowLayout = row.AddComponent<HorizontalLayoutGroup>();
             rowLayout.spacing = 10f;
             rowLayout.childAlignment = TextAnchor.MiddleRight;
             rowLayout.childControlWidth = false;
 
-            // Add Text first so it aligns to the left of the icon in UpperRight mode
+            // Calculate formatted text: e.g. "1/5 Neck"
+            string enemyCleanName = "";
+            float dropChance = 1f;
+            if (TrophyManager.TrophyToEnemy.TryGetValue(trophyPrefab, out string en)) enemyCleanName = en;
+            if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc)) dropChance = dc;
+
+            int kills = string.IsNullOrEmpty(enemyCleanName) ? 0 : TrophyManager.GetKillCount(enemyCleanName);
+            int expected = dropChance > 0 ? Mathf.RoundToInt(1f / dropChance) : 1;
+            string displayText = $"{kills}/{expected} {localizedName}";
+
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(row.transform, false);
             TMP_Text text = textObj.AddComponent<TextMeshProUGUI>();
-            text.text = name;
-            text.fontSize = 16;
+            if (TrophyManager.ValheimFont != null) text.font = TrophyManager.ValheimFont; // <-- Applied Font Fix
+            
+            text.text = displayText;
+            text.fontSize = 18;
             text.color = Color.white;
             text.alignment = TextAlignmentOptions.Right;
-            text.GetComponent<RectTransform>().sizeDelta = new Vector2(150, 30);
+            text.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 30);
 
             // Add Icon
             GameObject iconObj = new GameObject("Icon");

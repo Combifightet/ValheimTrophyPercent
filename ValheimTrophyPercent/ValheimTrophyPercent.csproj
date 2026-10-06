@@ -2,9 +2,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <TargetFramework>net4.8</TargetFramework>
+    <AssemblyName>TrophyPercent</AssemblyName>
+    <Description>Never again be uncertain when you will get the next trophy. \n\nThis mod allows you to see how many more enemies you need to kill to get the next trophy dropped.</Description>
+    <Version>0.0.3</Version>
+    <Copyright>Combifightet</Copyright>
+    <Authors>Combifightet</Authors>
   </PropertyGroup>
 
   <!-- including valheim specific libs -->

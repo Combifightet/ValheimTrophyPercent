@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
 
 namespace ValheimTrophyPercent
@@ -12,6 +11,13 @@ namespace ValheimTrophyPercent
 
         // Caches the total number of trophies in the game
         public static int TotalTrophiesInGame = -1;
+        
+        // Store Valheim's font here so all our custom UI can use it safely
+        public static TMP_FontAsset ValheimFont;
+
+        // Caches to map "TrophyBoar" -> "Boar" and its drop chance (e.g. 0.15)
+        public static Dictionary<string, string> TrophyToEnemy = new Dictionary<string, string>();
+        public static Dictionary<string, float> TrophyDropChances = new Dictionary<string, float>();
 
         public static void TogglePin(string trophyPrefabName)
         {
@@ -21,6 +27,53 @@ namespace ValheimTrophyPercent
                 PinnedTrophies.Add(trophyPrefabName);
             
             ProgressList.UpdatePinnedUI();
+        }
+
+        public static void CacheEnemyData()
+        {
+            if (TrophyToEnemy.Count > 0 || ZNetScene.instance == null) return;
+
+            foreach (GameObject prefab in ZNetScene.instance.m_prefabs)
+            {
+                CharacterDrop charDrop = prefab.GetComponent<CharacterDrop>();
+                if (charDrop != null)
+                {
+                    string cleanName = Utils.GetPrefabName(prefab);
+                    foreach (var drop in charDrop.m_drops)
+                    {
+                        if (drop.m_prefab == null) continue;
+                        ItemDrop itemDrop = drop.m_prefab.GetComponent<ItemDrop>();
+                        
+                        if (itemDrop != null && itemDrop.m_itemData.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Trophy)
+                        {
+                            string trophyName = drop.m_prefab.name;
+                            if (!TrophyToEnemy.ContainsKey(trophyName))
+                            {
+                                TrophyToEnemy[trophyName] = cleanName;
+                                TrophyDropChances[trophyName] = drop.m_chance;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public static int GetKillCount(string enemyCleanName)
+        {
+            PlayerProfile profile = Game.instance.GetPlayerProfile();
+            int kills = 0;
+            for (int i = 0; i < 10; i++)
+            {
+                for (int k = 0; k < 5; k++)
+                {
+                    if (profile.m_playerStats[i].m_enemyStats[k] != null &&
+                        profile.m_playerStats[i].m_enemyStats[k].TryGetValue(enemyCleanName, out float kCount))
+                    {
+                        kills += (int)kCount;
+                    }
+                }
+            }
+            return kills;
         }
 
         public static int GetTotalTrophies()
@@ -41,55 +94,18 @@ namespace ValheimTrophyPercent
 
         public static List<string> GetKilledButMissingTrophies()
         {
+            CacheEnemyData(); // Ensure we have data
             List<string> missing = new List<string>();
             List<string> collected = Player.m_localPlayer.GetTrophies();
-            PlayerProfile profile = Game.instance.GetPlayerProfile();
-
-            // Gather all enemy kills across all difficulty categories
-            HashSet<string> killedEnemies = new HashSet<string>();
-            for (int i = 0; i < 10; i++)
+            
+            foreach (var kvp in TrophyToEnemy)
             {
-                for (int k = 0; k < 5; k++)
-                {
-                    if (profile.m_playerStats[i].m_enemyStats[k] != null)
-                    {
-                        foreach (var stat in profile.m_playerStats[i].m_enemyStats[k])
-                        {
-                            if (stat.Value > 0) killedEnemies.Add(stat.Key);
-                        }
-                    }
-                }
-            }
+                string trophyName = kvp.Key;
+                string enemyName = kvp.Value;
 
-            // Cross-reference kills with CharacterDrops in ZNetScene
-            if (ZNetScene.instance != null)
-            {
-                foreach (GameObject prefab in ZNetScene.instance.m_prefabs)
+                if (!collected.Contains(trophyName) && GetKillCount(enemyName) > 0)
                 {
-                    // Clean up prefab name to match kill stat keys (removes (Clone) etc.)
-                    string cleanName = Utils.GetPrefabName(prefab); 
-
-                    if (killedEnemies.Contains(cleanName))
-                    {
-                        CharacterDrop charDrop = prefab.GetComponent<CharacterDrop>();
-                        if (charDrop != null)
-                        {
-                            foreach (var drop in charDrop.m_drops)
-                            {
-                                if (drop.m_prefab == null) continue;
-                                ItemDrop itemDrop = drop.m_prefab.GetComponent<ItemDrop>();
-                                
-                                if (itemDrop != null && itemDrop.m_itemData.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Trophy)
-                                {
-                                    string trophyName = drop.m_prefab.name;
-                                    if (!collected.Contains(trophyName) && !missing.Contains(trophyName))
-                                    {
-                                        missing.Add(trophyName);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    missing.Add(trophyName);
                 }
             }
             return missing;

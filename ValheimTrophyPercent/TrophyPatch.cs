@@ -1,20 +1,26 @@
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Events;
 using TMPro;
 using System.Collections.Generic;
 
 namespace ValheimTrophyPercent
 {
-    // Adjust typeof() to the class that actually holds UpdateTrophyList in your build
-    [HarmonyPatch(typeof(TextsDialog), "UpdateTrophyList")] 
-    public static class TextsDialog_UpdateTrophyList_Patch
+    [HarmonyPatch(typeof(InventoryGui), "UpdateTrophyList")] 
+    public static class InventoryGui_UpdateTrophyList_Patch
     {
-        public static void Postfix(TextsDialog __instance, ref List<GameObject> ___m_trophyList, RectTransform ___m_trophieListRoot, GameObject ___m_trophieElementPrefab, float ___m_trophieListSpace)
+        public static void Postfix(InventoryGui __instance, ref List<GameObject> ___m_trophyList, RectTransform ___m_trophieListRoot, GameObject ___m_trophieElementPrefab, float ___m_trophieListSpace)
         {
             if (Player.m_localPlayer == null) return;
 
+            // FIX: Steal the font from the vanilla UI template before doing anything else
+            if (TrophyManager.ValheimFont == null && ___m_trophieElementPrefab != null)
+            {
+                TMP_Text templateText = ___m_trophieElementPrefab.transform.Find("name").GetComponent<TMP_Text>();
+                if (templateText != null) TrophyManager.ValheimFont = templateText.font;
+            }
+
+            TrophyManager.CacheEnemyData();
             List<string> collected = Player.m_localPlayer.GetTrophies();
             int total = TrophyManager.GetTotalTrophies();
             
@@ -24,7 +30,6 @@ namespace ValheimTrophyPercent
             // 2. Add Toggle Buttons to EXISTING collected trophies
             for (int i = 0; i < collected.Count; i++)
             {
-                // The vanilla code just populated ___m_trophyList. We can access the elements directly.
                 GameObject uiElement = ___m_trophyList[i];
                 string trophyPrefabName = collected[i];
                 AddPinButtonToElement(uiElement, trophyPrefabName);
@@ -52,15 +57,13 @@ namespace ValheimTrophyPercent
                 );
                 
                 lowestY = Mathf.Min(lowestY, rectTransform.anchoredPosition.y - ___m_trophieListSpace);
-
                 string locName = Localization.instance.Localize(component.m_itemData.m_shared.m_name);
                 
                 // Set Icon and tint it dark/gray to indicate it's missing
                 Image iconImg = rectTransform.Find("icon_bkg/icon").GetComponent<Image>();
                 iconImg.sprite = component.m_itemData.GetIcon();
-                iconImg.color = new Color(0.2f, 0.2f, 0.2f, 0.8f); // Dark tint
+                iconImg.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
 
-                // Append "(Missing)" to the name
                 rectTransform.Find("name").GetComponent<TMP_Text>().text = locName + " <color=red>(Missing)</color>";
                 rectTransform.Find("description").GetComponent<TMP_Text>().text = "You have slain this beast, but the trophy eludes you...";
 
@@ -87,6 +90,7 @@ namespace ValheimTrophyPercent
             rt.anchorMax = new Vector2(0, 1);
 
             TMP_Text text = textObj.AddComponent<TextMeshProUGUI>();
+            if (TrophyManager.ValheimFont != null) text.font = TrophyManager.ValheimFont; // <-- Applied Font Fix
             text.text = $"<color=orange>Trophies:</color> {collected} / {total}";
             text.fontSize = 24;
         }
@@ -104,7 +108,6 @@ namespace ValheimTrophyPercent
             btnRect.sizeDelta = new Vector2(30, 30);
 
             Image img = btnObj.AddComponent<Image>();
-            // Use standard Unity UI sprite, or load a custom pin icon
             img.color = TrophyManager.PinnedTrophies.Contains(trophyPrefabName) ? Color.green : Color.gray;
 
             Button btn = btnObj.AddComponent<Button>();
@@ -119,7 +122,8 @@ namespace ValheimTrophyPercent
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(btnObj.transform, false);
             TMP_Text txt = textObj.AddComponent<TextMeshProUGUI>();
-            txt.text = "*"; // Placeholder for a pin icon
+            if (TrophyManager.ValheimFont != null) txt.font = TrophyManager.ValheimFont; // <-- Applied Font Fix
+            txt.text = "*"; 
             txt.color = Color.white;
             txt.alignment = TextAlignmentOptions.Center;
         }
