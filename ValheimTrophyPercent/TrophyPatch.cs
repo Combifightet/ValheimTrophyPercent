@@ -13,7 +13,7 @@ namespace ValheimTrophyPercent
         {
             if (Player.m_localPlayer == null) return;
 
-            // FIX: Steal the font from the vanilla UI template before doing anything else
+            // fallback font grab just in case
             if (TrophyManager.ValheimFont == null && ___m_trophieElementPrefab != null)
             {
                 TMP_Text templateText = ___m_trophieElementPrefab.transform.Find("name").GetComponent<TMP_Text>();
@@ -85,12 +85,19 @@ namespace ValheimTrophyPercent
             textObj.transform.SetParent(root.parent, false); // Attach to parent so it doesn't scroll away, or root if you want it to scroll
             
             RectTransform rt = textObj.AddComponent<RectTransform>();
-            rt.anchoredPosition = new Vector2(20, -20);
+            // FIX: Set a proper Top-Left Pivot and Size Delta to prevent the text from clipping 
+            rt.pivot = new Vector2(0, 1); 
             rt.anchorMin = new Vector2(0, 1);
             rt.anchorMax = new Vector2(0, 1);
+            rt.sizeDelta = new Vector2(400, 40); 
+            rt.anchoredPosition = new Vector2(10, -5); 
 
             TMP_Text text = textObj.AddComponent<TextMeshProUGUI>();
-            if (TrophyManager.ValheimFont != null) text.font = TrophyManager.ValheimFont; // <-- Applied Font Fix
+            if (TrophyManager.ValheimFont != null) text.font = TrophyManager.ValheimFont;
+            
+            // FIX: Allow text to overflow its container rather than vanishing
+            text.overflowMode = TextOverflowModes.Overflow; 
+            text.enableWordWrapping = false;
             text.text = $"<color=orange>Trophies:</color> {collected} / {total}";
             text.fontSize = 24;
         }
@@ -122,7 +129,7 @@ namespace ValheimTrophyPercent
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(btnObj.transform, false);
             TMP_Text txt = textObj.AddComponent<TextMeshProUGUI>();
-            if (TrophyManager.ValheimFont != null) txt.font = TrophyManager.ValheimFont; // <-- Applied Font Fix
+            if (TrophyManager.ValheimFont != null) txt.font = TrophyManager.ValheimFont;
             txt.text = "*"; 
             txt.color = Color.white;
             txt.alignment = TextAlignmentOptions.Center;

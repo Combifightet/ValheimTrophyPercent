@@ -17,7 +17,11 @@ namespace ValheimTrophyPercent
             {
                 if (__instance.m_rootObject == null) return;
 
-                // Create the base UI panel and attach it directly to the HUD root
+                if (TrophyManager.ValheimFont == null && __instance.m_hoverName != null)
+                {
+                    TrophyManager.ValheimFont = __instance.m_hoverName.font;
+                }
+
                 PinnedPanel = new GameObject("PinnedTrophiesPanel");
                 PinnedPanel.transform.SetParent(__instance.m_rootObject.transform, false);
                 
@@ -40,9 +44,28 @@ namespace ValheimTrophyPercent
             }
         }
 
+        // Add an update patch to keep the pinned list in sync with your kills automatically
+        [HarmonyPatch(typeof(Hud), "Update")]
+        public static class Hud_Update_Patch
+        {
+            private static float updateTimer = 0f;
+            public static void Postfix()
+            {
+                if (PinnedPanel == null || !PinnedPanel.activeInHierarchy) return;
+                
+                updateTimer += Time.deltaTime;
+                if (updateTimer > 2f) // Refresh kills every 2 seconds
+                {
+                    updateTimer = 0f;
+                    UpdatePinnedUI();
+                }
+            }
+        }
+
         public static void UpdatePinnedUI()
         {
             if (PinnedPanel == null || ObjectDB.instance == null) return;
+            TrophyManager.CacheEnemyData(); // Ensure we have the drop chances loaded
 
             foreach (Transform child in PinnedPanel.transform)
             {
@@ -72,22 +95,27 @@ namespace ValheimTrophyPercent
             HorizontalLayoutGroup rowLayout = row.AddComponent<HorizontalLayoutGroup>();
             rowLayout.spacing = 10f;
             rowLayout.childAlignment = TextAnchor.MiddleRight;
+            
+            // disable forced expansion to prevent the icon from stretching vertically
             rowLayout.childControlWidth = false;
+            rowLayout.childControlHeight = false; 
+            rowLayout.childForceExpandWidth = false;
+            rowLayout.childForceExpandHeight = false;
 
             // Calculate formatted text: e.g. "1/5 Neck"
-            string enemyCleanName = "";
+            string enemyKey = "";
             float dropChance = 1f;
-            if (TrophyManager.TrophyToEnemy.TryGetValue(trophyPrefab, out string en)) enemyCleanName = en;
+            if (TrophyManager.TrophyToEnemy.TryGetValue(trophyPrefab, out string en)) enemyKey = en;
             if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc)) dropChance = dc;
 
-            int kills = string.IsNullOrEmpty(enemyCleanName) ? 0 : TrophyManager.GetKillCount(enemyCleanName);
+            int kills = string.IsNullOrEmpty(enemyKey) ? 0 : TrophyManager.GetKillCount(enemyKey);
             int expected = dropChance > 0 ? Mathf.RoundToInt(1f / dropChance) : 1;
             string displayText = $"{kills}/{expected} {localizedName}";
 
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(row.transform, false);
             TMP_Text text = textObj.AddComponent<TextMeshProUGUI>();
-            if (TrophyManager.ValheimFont != null) text.font = TrophyManager.ValheimFont; // <-- Applied Font Fix
+            if (TrophyManager.ValheimFont != null) text.font = TrophyManager.ValheimFont;
             
             text.text = displayText;
             text.fontSize = 18;
@@ -100,6 +128,7 @@ namespace ValheimTrophyPercent
             iconObj.transform.SetParent(row.transform, false);
             Image img = iconObj.AddComponent<Image>();
             img.sprite = icon;
+            img.preserveAspect = true;
             iconObj.GetComponent<RectTransform>().sizeDelta = new Vector2(25, 25);
         }
     }

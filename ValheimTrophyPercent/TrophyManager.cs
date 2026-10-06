@@ -36,9 +36,13 @@ namespace ValheimTrophyPercent
             foreach (GameObject prefab in ZNetScene.instance.m_prefabs)
             {
                 CharacterDrop charDrop = prefab.GetComponent<CharacterDrop>();
-                if (charDrop != null)
+                Character character = prefab.GetComponent<Character>();
+                
+                if (charDrop != null && character != null)
                 {
-                    string cleanName = Utils.GetPrefabName(prefab);
+                    // use m_name (e.g., "$enemy_neck") to match Valheim's internal kill tracker perfectly
+                    string enemyKey = character.m_name; 
+
                     foreach (var drop in charDrop.m_drops)
                     {
                         if (drop.m_prefab == null) continue;
@@ -49,7 +53,7 @@ namespace ValheimTrophyPercent
                             string trophyName = drop.m_prefab.name;
                             if (!TrophyToEnemy.ContainsKey(trophyName))
                             {
-                                TrophyToEnemy[trophyName] = cleanName;
+                                TrophyToEnemy[trophyName] = enemyKey;
                                 TrophyDropChances[trophyName] = drop.m_chance;
                             }
                         }
@@ -58,16 +62,18 @@ namespace ValheimTrophyPercent
             }
         }
 
-        public static int GetKillCount(string enemyCleanName)
+        public static int GetKillCount(string enemyKey)
         {
+            if (Game.instance == null) return 0;
             PlayerProfile profile = Game.instance.GetPlayerProfile();
             int kills = 0;
+            
             for (int i = 0; i < 10; i++)
             {
                 for (int k = 0; k < 5; k++)
                 {
                     if (profile.m_playerStats[i].m_enemyStats[k] != null &&
-                        profile.m_playerStats[i].m_enemyStats[k].TryGetValue(enemyCleanName, out float kCount))
+                        profile.m_playerStats[i].m_enemyStats[k].TryGetValue(enemyKey, out float kCount))
                     {
                         kills += (int)kCount;
                     }
@@ -97,13 +103,13 @@ namespace ValheimTrophyPercent
             CacheEnemyData(); // Ensure we have data
             List<string> missing = new List<string>();
             List<string> collected = Player.m_localPlayer.GetTrophies();
-            
+
             foreach (var kvp in TrophyToEnemy)
             {
                 string trophyName = kvp.Key;
-                string enemyName = kvp.Value;
+                string enemyKey = kvp.Value;
 
-                if (!collected.Contains(trophyName) && GetKillCount(enemyName) > 0)
+                if (!collected.Contains(trophyName) && GetKillCount(enemyKey) > 0)
                 {
                     missing.Add(trophyName);
                 }
