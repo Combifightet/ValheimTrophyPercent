@@ -17,11 +17,6 @@ namespace ValheimTrophyPercent
             {
                 if (__instance.m_rootObject == null) return;
 
-                if (TrophyManager.ValheimFont == null && __instance.m_hoverName != null)
-                {
-                    TrophyManager.ValheimFont = __instance.m_hoverName.font;
-                }
-
                 PinnedPanel = new GameObject("PinnedTrophiesPanel");
                 PinnedPanel.transform.SetParent(__instance.m_rootObject.transform, false);
                 
@@ -34,11 +29,19 @@ namespace ValheimTrophyPercent
                 
                 // Offset down by 250 pixels (below the minimap's default footprint) and 20 pixels left
                 Container.anchoredPosition = new Vector2(-30, -260);
-                Container.sizeDelta = new Vector2(250, 400);
+                Container.sizeDelta = new Vector2(250, 0); // Allow it to shrink to fit
 
                 VerticalLayoutGroup layout = PinnedPanel.AddComponent<VerticalLayoutGroup>();
                 layout.childAlignment = TextAnchor.UpperRight;
-                layout.spacing = 5f;
+                layout.spacing = 2f;
+                // stop the layout from spreading elements across the screen
+                layout.childControlHeight = true;
+                layout.childControlWidth = true;
+                layout.childForceExpandHeight = false; 
+                layout.childForceExpandWidth = false;
+
+                ContentSizeFitter fitter = PinnedPanel.AddComponent<ContentSizeFitter>();
+                fitter.verticalFit = ContentSizeFitter.FitMode.MinSize;
 
                 UpdatePinnedUI();
             }
@@ -64,7 +67,7 @@ namespace ValheimTrophyPercent
 
         public static void UpdatePinnedUI()
         {
-            if (PinnedPanel == null || ObjectDB.instance == null) return;
+            if (PinnedPanel == null || ObjectDB.instance == null || Hud.instance == null) return;
             TrophyManager.CacheEnemyData(); // Ensure we have the drop chances loaded
 
             foreach (Transform child in PinnedPanel.transform)
@@ -89,9 +92,11 @@ namespace ValheimTrophyPercent
         {
             GameObject row = new GameObject("PinnedRow");
             row.transform.SetParent(PinnedPanel.transform, false);
-            RectTransform rowRect = row.AddComponent<RectTransform>();
-            rowRect.sizeDelta = new Vector2(250, 30);
             
+            LayoutElement layoutElement = row.AddComponent<LayoutElement>();
+            layoutElement.minHeight = 30f;
+            layoutElement.minWidth = 250f;
+
             HorizontalLayoutGroup rowLayout = row.AddComponent<HorizontalLayoutGroup>();
             rowLayout.spacing = 10f;
             rowLayout.childAlignment = TextAnchor.MiddleRight;
@@ -102,26 +107,31 @@ namespace ValheimTrophyPercent
             rowLayout.childForceExpandWidth = false;
             rowLayout.childForceExpandHeight = false;
 
-            // Calculate formatted text: e.g. "1/5 Neck"
-            string enemyKey = "";
-            float dropChance = 1f;
-            if (TrophyManager.TrophyToEnemy.TryGetValue(trophyPrefab, out string en)) enemyKey = en;
-            if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc)) dropChance = dc;
+            // read Valheim's internal pity timer to see exactly how many kills are remaining
+            int remaining = 1;
+            if (CharacterDrop.s_pseudoCounter != null && CharacterDrop.s_pseudoCounter.TryGetValue(trophyPrefab, out var tuple))
+            {
+                remaining = tuple.Item2;
+            }
+            else if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc))
+            {
+                remaining = Mathf.RoundToInt(1f / dc);
+            }
 
-            int kills = string.IsNullOrEmpty(enemyKey) ? 0 : TrophyManager.GetKillCount(enemyKey);
-            int expected = dropChance > 0 ? Mathf.RoundToInt(1f / dropChance) : 1;
-            string displayText = $"{kills}/{expected} {localizedName}";
+            // format as "5 Left - Neck" since the game only tracks remaining, not the starting goal
+            string displayText = $"{remaining} Left - {localizedName}";
 
-            GameObject textObj = new GameObject("Text");
-            textObj.transform.SetParent(row.transform, false);
-            TMP_Text text = textObj.AddComponent<TextMeshProUGUI>();
-            if (TrophyManager.ValheimFont != null) text.font = TrophyManager.ValheimFont;
+            // clone the HUD's hover name to guarantee a warning-free Font Asset
+            GameObject textObj = UnityEngine.Object.Instantiate(Hud.instance.m_hoverName.gameObject, row.transform);
+            textObj.name = "Text";
             
+            TMP_Text text = textObj.GetComponent<TMP_Text>();
             text.text = displayText;
             text.fontSize = 18;
             text.color = Color.white;
             text.alignment = TextAlignmentOptions.Right;
             text.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 30);
+            textObj.SetActive(true);
 
             // Add Icon
             GameObject iconObj = new GameObject("Icon");

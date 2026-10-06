@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
 
 namespace ValheimTrophyPercent
 {
@@ -11,11 +11,8 @@ namespace ValheimTrophyPercent
 
         // Caches the total number of trophies in the game
         public static int TotalTrophiesInGame = -1;
-        
-        // Store Valheim's font here so all our custom UI can use it safely
-        public static TMP_FontAsset ValheimFont;
 
-        // Caches to map "TrophyBoar" -> "Boar" and its drop chance (e.g. 0.15)
+        // caches to map "TrophyBoar" -> "Boar" and its drop chance (e.g. 0.15)
         public static Dictionary<string, string> TrophyToEnemy = new Dictionary<string, string>();
         public static Dictionary<string, float> TrophyDropChances = new Dictionary<string, float>();
 
@@ -66,20 +63,14 @@ namespace ValheimTrophyPercent
         {
             if (Game.instance == null) return 0;
             PlayerProfile profile = Game.instance.GetPlayerProfile();
-            int kills = 0;
             
-            for (int i = 0; i < 10; i++)
+            // Only check the master aggregate bucket to prevent double counting
+            if (profile.m_playerStats[0].m_enemyStats[0] != null && 
+                profile.m_playerStats[0].m_enemyStats[0].TryGetValue(enemyKey, out float kCount))
             {
-                for (int k = 0; k < 5; k++)
-                {
-                    if (profile.m_playerStats[i].m_enemyStats[k] != null &&
-                        profile.m_playerStats[i].m_enemyStats[k].TryGetValue(enemyKey, out float kCount))
-                    {
-                        kills += (int)kCount;
-                    }
-                }
+                return (int)kCount;
             }
-            return kills;
+            return 0;
         }
 
         public static int GetTotalTrophies()
@@ -100,7 +91,7 @@ namespace ValheimTrophyPercent
 
         public static List<string> GetKilledButMissingTrophies()
         {
-            CacheEnemyData(); // Ensure we have data
+            CacheEnemyData(); // ensure we have data
             List<string> missing = new List<string>();
             List<string> collected = Player.m_localPlayer.GetTrophies();
 

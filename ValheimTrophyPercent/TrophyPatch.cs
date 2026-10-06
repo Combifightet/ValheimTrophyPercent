@@ -11,28 +11,21 @@ namespace ValheimTrophyPercent
     {
         public static void Postfix(InventoryGui __instance, ref List<GameObject> ___m_trophyList, RectTransform ___m_trophieListRoot, GameObject ___m_trophieElementPrefab, float ___m_trophieListSpace)
         {
-            if (Player.m_localPlayer == null) return;
-
-            // fallback font grab just in case
-            if (TrophyManager.ValheimFont == null && ___m_trophieElementPrefab != null)
-            {
-                TMP_Text templateText = ___m_trophieElementPrefab.transform.Find("name").GetComponent<TMP_Text>();
-                if (templateText != null) TrophyManager.ValheimFont = templateText.font;
-            }
+            if (Player.m_localPlayer == null || ___m_trophieElementPrefab == null) return;
 
             TrophyManager.CacheEnemyData();
             List<string> collected = Player.m_localPlayer.GetTrophies();
             int total = TrophyManager.GetTotalTrophies();
             
-            // 1. Add Percentage/Counter UI
-            AddProgressText(___m_trophieListRoot, collected.Count, total);
+			// 1. Add Percentage/Counter UI
+            AddProgressText(___m_trophieListRoot, ___m_trophieElementPrefab, collected.Count, total);
 
             // 2. Add Toggle Buttons to EXISTING collected trophies
             for (int i = 0; i < collected.Count; i++)
             {
                 GameObject uiElement = ___m_trophyList[i];
                 string trophyPrefabName = collected[i];
-                AddPinButtonToElement(uiElement, trophyPrefabName);
+                AddPinButtonToElement(uiElement, ___m_trophieElementPrefab, trophyPrefabName);
             }
 
             // 3. Add "Killed but Missing" Trophies
@@ -68,9 +61,9 @@ namespace ValheimTrophyPercent
                 rectTransform.Find("description").GetComponent<TMP_Text>().text = "You have slain this beast, but the trophy eludes you...";
 
                 ___m_trophyList.Add(gameObject);
-                
-                // Add pin button to missing trophies as well
-                AddPinButtonToElement(gameObject, missingTrophy);
+
+				// Add pin button to missing trophies as well
+                AddPinButtonToElement(gameObject, ___m_trophieElementPrefab, missingTrophy);
             }
 
             // Resize the container to fit the newly added elements
@@ -78,33 +71,31 @@ namespace ValheimTrophyPercent
             ___m_trophieListRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, finalSize + 100f);
         }
 
-        private static void AddProgressText(RectTransform root, int collected, int total)
+        private static void AddProgressText(RectTransform root, GameObject templatePrefab, int collected, int total)
         {
-            // Create a simple text element at the top left of the root
-            GameObject textObj = new GameObject("ProgressText");
-            textObj.transform.SetParent(root.parent, false); // Attach to parent so it doesn't scroll away, or root if you want it to scroll
+            // clone the template text object to prevent Font Asset warnings
+            GameObject templateText = templatePrefab.transform.Find("name").gameObject;
+            GameObject textObj = UnityEngine.Object.Instantiate(templateText, root.parent);
+            textObj.name = "ProgressText";
             
-            RectTransform rt = textObj.AddComponent<RectTransform>();
-            // FIX: Set a proper Top-Left Pivot and Size Delta to prevent the text from clipping 
+            RectTransform rt = textObj.GetComponent<RectTransform>();
             rt.pivot = new Vector2(0, 1); 
             rt.anchorMin = new Vector2(0, 1);
             rt.anchorMax = new Vector2(0, 1);
             rt.sizeDelta = new Vector2(400, 40); 
             rt.anchoredPosition = new Vector2(10, -5); 
 
-            TMP_Text text = textObj.AddComponent<TextMeshProUGUI>();
-            if (TrophyManager.ValheimFont != null) text.font = TrophyManager.ValheimFont;
-            
-            // FIX: Allow text to overflow its container rather than vanishing
+            TMP_Text text = textObj.GetComponent<TMP_Text>();
             text.overflowMode = TextOverflowModes.Overflow; 
             text.enableWordWrapping = false;
             text.text = $"<color=orange>Trophies:</color> {collected} / {total}";
             text.fontSize = 24;
+            text.alignment = TextAlignmentOptions.TopLeft;
         }
 
-        private static void AddPinButtonToElement(GameObject uiElement, string trophyPrefabName)
+        private static void AddPinButtonToElement(GameObject uiElement, GameObject templatePrefab, string trophyPrefabName)
         {
-            // Create a small UI Button in the corner of the trophy element
+            // create a small UI Button in the corner of the trophy element
             GameObject btnObj = new GameObject("PinButton");
             btnObj.transform.SetParent(uiElement.transform, false);
             
@@ -121,18 +112,20 @@ namespace ValheimTrophyPercent
             btn.onClick.AddListener(() => 
             {
                 TrophyManager.TogglePin(trophyPrefabName);
-                // Update button color visually immediately
+                // update button color visually immediately
                 img.color = TrophyManager.PinnedTrophies.Contains(trophyPrefabName) ? Color.green : Color.gray;
             });
 
-            // Add text to the button
-            GameObject textObj = new GameObject("Text");
-            textObj.transform.SetParent(btnObj.transform, false);
-            TMP_Text txt = textObj.AddComponent<TextMeshProUGUI>();
-            if (TrophyManager.ValheimFont != null) txt.font = TrophyManager.ValheimFont;
+            // clone text object to prevent warnings
+            GameObject templateText = templatePrefab.transform.Find("name").gameObject;
+            GameObject textObj = UnityEngine.Object.Instantiate(templateText, btnObj.transform);
+            textObj.name = "Text";
+            
+            TMP_Text txt = textObj.GetComponent<TMP_Text>();
             txt.text = "*"; 
             txt.color = Color.white;
             txt.alignment = TextAlignmentOptions.Center;
+            txt.GetComponent<RectTransform>().anchoredPosition = Vector2.zero;
         }
     }
 }
