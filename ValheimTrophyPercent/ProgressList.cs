@@ -86,6 +86,10 @@ namespace ValheimTrophyPercent
 
                 ItemDrop itemDrop = prefab.GetComponent<ItemDrop>();
                 string localizedName = Localization.instance.Localize(itemDrop.m_itemData.m_shared.m_name);
+                
+                // Strip the word "Trophy" from the translation for a cleaner layout
+                localizedName = localizedName.Replace(" trophy", "").Replace(" Trophy", "");
+                
                 Sprite icon = itemDrop.m_itemData.GetIcon();
 
                 CreateRow(trophyPrefab, localizedName, icon);
@@ -112,17 +116,45 @@ namespace ValheimTrophyPercent
             rowLayout.childForceExpandHeight = false;
 
             // Pull Valheim's exact remaining kills from the live pity timer 
-            int remaining = 1;
+            int expected = 1;
+            if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc))
+            {
+                expected = Mathf.Max(1, Mathf.RoundToInt(1f / dc));
+            }
+
+            int remaining = expected;
+            bool isPredicted = false;
+
             if (CharacterDrop.s_pseudoCounter != null && CharacterDrop.s_pseudoCounter.TryGetValue(trophyPrefab, out var tuple))
             {
                 remaining = tuple.Item2;
+                
+                // Multiplayer sync fix: if the item didn't drop locally, it counts down into the negatives.
+                // We wrap it around based on expected value to keep providing an accurate count.
+                if (remaining <= 0)
+                {
+                    remaining = expected + (remaining % expected);
+                    if (remaining <= 0) remaining = expected;
+                    isPredicted = true;
+                }
             }
-            else if (TrophyManager.TrophyDropChances.TryGetValue(trophyPrefab, out float dc))
+            else 
             {
-                remaining = Mathf.RoundToInt(1f / dc); // Fallback if no kills have happened yet this session
+                isPredicted = true;
+                
+                // Fallback: Use lifetime kills if the pseudo counter has not started tracking yet this session
+                string enemyKey = "";
+                if (TrophyManager.TrophyToEnemy.TryGetValue(trophyPrefab, out enemyKey))
+                {
+                    int totalKills = TrophyManager.GetKillCount(enemyKey);
+                    remaining = expected - (totalKills % expected);
+                    if (remaining <= 0) remaining = expected;
+                }
             }
 
-            string displayText = $"{remaining} Left - {localizedName}";
+            // Prefix a tilde if this isn't an absolutely certain counter
+            string prefix = isPredicted ? "~" : "";
+            string displayText = $"{prefix}{remaining} Left - {localizedName}";
 
             GameObject textObj = UnityEngine.Object.Instantiate(Hud.instance.m_hoverName.gameObject, row.transform);
             textObj.name = "Text";

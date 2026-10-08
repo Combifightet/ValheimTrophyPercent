@@ -37,6 +37,10 @@ namespace ValheimTrophyPercent
                         Image check = t.graphic as Image;
                         if (bg != null && check != null && bg.sprite != null && check.sprite != null)
                         {
+                            // Filter out the multiplayer map / public position toggles so we only grab the UI settings checkbox
+                            if (t.name.Contains("Map") || t.name.Contains("Public") || bg.sprite.name.Contains("map")) 
+                                continue;
+
                             CheckboxBackground = bg.sprite;
                             Checkmark = check.sprite;
                             break;

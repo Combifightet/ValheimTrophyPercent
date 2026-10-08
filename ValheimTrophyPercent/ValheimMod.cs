@@ -13,7 +13,7 @@ namespace ValheimTrophyPercent
         // Define your mod credentials as constants
         const string pluginGUID = "Combifightet.TrophyPercent";
         const string pluginName = "Valheim Trophy Percent";
-        const string pluginVersion = "1.0.0";
+        const string pluginVersion = "1.1.0";
 
         // Create the Harmony instance using your GUID
         private readonly Harmony HarmonyInstance = new Harmony(pluginGUID);
@@ -31,7 +31,8 @@ namespace ValheimTrophyPercent
             logger.LogInfo("Trophy Percent Mod is loading...");
 
             // Bind our config file to store a string of pinned trophies
-            PinnedTrophiesConfig = Config.Bind("General", "PinnedTrophies", "", "Comma-separated list of pinned trophy prefab names.");
+            // Added a formatting example so users know how to manually edit this file
+            PinnedTrophiesConfig = Config.Bind("General", "PinnedTrophies", "", "Comma-separated list of pinned trophy prefab names. Example: TrophyBoar,TrophyNeck,TrophyDeer");
             TrophyManager.LoadConfig(PinnedTrophiesConfig.Value);
 
             Assembly assembly = Assembly.GetExecutingAssembly();

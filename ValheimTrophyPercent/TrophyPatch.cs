@@ -20,8 +20,18 @@ namespace ValheimTrophyPercent
             List<string> collected = Player.m_localPlayer.GetTrophies();
             int total = TrophyManager.GetTotalTrophies();
             
-			// 1. Add Percentage/Counter UI
-            AddProgressText(___m_trophieListRoot, ___m_trophieElementPrefab, collected.Count, total);
+            Transform panel = __instance.m_trophiesPanel.transform;
+
+            // 1. Append Percentage/Counter UI cleanly to the native title text instead of floating over trophies
+            TMP_Text topicText = panel.Find("Topic")?.GetComponent<TMP_Text>() ?? panel.Find("topic")?.GetComponent<TMP_Text>();
+            if (topicText != null)
+            {
+                string baseText = Localization.instance.Localize("$inventory_trophies");
+                topicText.text = $"{baseText} <color=orange>({collected.Count}/{total})</color>";
+            }
+
+            // 1b. Inject the "Clear All" button in the bottom left
+            AddClearAllButton(panel);
 
             // 2. Add Toggle Buttons to EXISTING collected trophies
             for (int i = 0; i < collected.Count; i++)
@@ -65,7 +75,7 @@ namespace ValheimTrophyPercent
 
                 ___m_trophyList.Add(gameObject);
 
-				// Add pin button to missing trophies as well
+                // Add pin button to missing trophies as well
                 AddPinButtonToElement(gameObject, missingTrophy);
             }
 
@@ -74,26 +84,55 @@ namespace ValheimTrophyPercent
             ___m_trophieListRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, finalSize + 100f);
         }
 
-        private static void AddProgressText(RectTransform root, GameObject templatePrefab, int collected, int total)
+private static void AddClearAllButton(Transform panel)
         {
-            // clone the template text object to prevent Font Asset warnings
-            GameObject templateText = templatePrefab.transform.Find("name").gameObject;
-            GameObject textObj = UnityEngine.Object.Instantiate(templateText, root.parent);
-            textObj.name = "ProgressText";
-            
-            RectTransform rt = textObj.GetComponent<RectTransform>();
-            rt.pivot = new Vector2(0, 1); 
-            rt.anchorMin = new Vector2(0, 1);
-            rt.anchorMax = new Vector2(0, 1);
-            rt.sizeDelta = new Vector2(400, 40); 
-            rt.anchoredPosition = new Vector2(10, -5); 
+            // Only add the button once to prevent infinite instantiation 
+            if (panel.Find("ClearAllButton") != null) return;
 
-            TMP_Text text = textObj.GetComponent<TMP_Text>();
-            text.overflowMode = TextOverflowModes.Overflow; 
-            text.enableWordWrapping = false;
-            text.text = $"<color=orange>Trophies:</color> {collected} / {total}";
-            text.fontSize = 24;
-            text.alignment = TextAlignmentOptions.TopLeft;
+            // Find the existing close button to clone its styling and hierarchy placement
+            Button[] buttons = panel.GetComponentsInChildren<Button>(true);
+            Button closeBtn = null;
+            foreach (var b in buttons)
+            {
+                if (b.name.ToLower().Contains("close"))
+                {
+                    closeBtn = b;
+                    break;
+                }
+            }
+
+            if (closeBtn != null)
+            {
+                GameObject clearBtnObj = UnityEngine.Object.Instantiate(closeBtn.gameObject, panel);
+                clearBtnObj.name = "ClearAllButton";
+                
+                RectTransform rt = clearBtnObj.GetComponent<RectTransform>();
+                
+                // Bind to bottom left and mirror the absolute X position for symmetry
+                rt.anchorMin = new Vector2(0, 0);
+                rt.anchorMax = new Vector2(0, 0);
+                rt.anchoredPosition = new Vector2(Mathf.Abs(rt.anchoredPosition.x), rt.anchoredPosition.y);
+                
+                TMP_Text txt = clearBtnObj.GetComponentInChildren<TMP_Text>();
+                if (txt != null) txt.text = "Clear All";
+                
+                Button btn = clearBtnObj.GetComponent<Button>();
+                btn.onClick.RemoveAllListeners(); // Remove the window closing logic
+                btn.onClick.AddListener(() => 
+                {
+                    // Clear data, save, and trigger UI rebuilds
+                    TrophyManager.PinnedTrophies.Clear();
+                    ValheimMod.Instance.SavePinnedConfig();
+                    ProgressList.UpdatePinnedUI();
+                    
+                    // Force the trophy menu to refresh its checkboxes visually instantly
+                    if (InventoryGui.instance != null)
+                    {
+                        // Use Harmony's AccessTools to invoke the private method
+                        AccessTools.Method(typeof(InventoryGui), "UpdateTrophyList")?.Invoke(InventoryGui.instance, null);
+                    }
+                });
+            }
         }
 
         private static void AddPinButtonToElement(GameObject uiElement, string trophyPrefabName)
