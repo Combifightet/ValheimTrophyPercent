@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace ValheimTrophyPercent
 {
-[HarmonyPatch(typeof(InventoryGui), "UpdateTrophyList")] 
+    [HarmonyPatch(typeof(InventoryGui), "UpdateTrophyList")] 
     public static class InventoryGui_UpdateTrophyList_Patch
     {
         public static void Postfix(InventoryGui __instance, ref List<GameObject> ___m_trophyList, RectTransform ___m_trophieListRoot, GameObject ___m_trophieElementPrefab, float ___m_trophieListSpace)
@@ -54,9 +54,6 @@ namespace ValheimTrophyPercent
 
                 titleText.text = $"{baseText} <color=orange>({collected.Count}/{total})</color>";
             }
-
-            // 1b. Inject the "Clear All" button in the bottom left
-            AddClearAllButton(panel);
 
             // 2. Add Toggle Buttons to EXISTING collected trophies
             for (int i = 0; i < collected.Count; i++)
@@ -107,82 +104,6 @@ namespace ValheimTrophyPercent
             // Resize the container to fit the newly added elements
             float finalSize = Mathf.Max(0f, -lowestY);
             ___m_trophieListRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, finalSize + 100f);
-        }
-
-        private static void AddClearAllButton(Transform panel)
-        {
-            if (panel.Find("ClearAllButton") != null) return;
-
-            // Try to find ANY existing button to steal its Valheim styling (Wood Sprite and Font)
-            Button templateBtn = panel.GetComponentInChildren<Button>(true);
-            Sprite btnSprite = null;
-            TMP_FontAsset btnFont = TrophyManager.GetValheimFont();
-
-            if (templateBtn != null)
-            {
-                Image templateImg = templateBtn.GetComponent<Image>();
-                if (templateImg != null) btnSprite = templateImg.sprite;
-                
-                TMP_Text templateTxt = templateBtn.GetComponentInChildren<TMP_Text>(true);
-                if (templateTxt != null) btnFont = templateTxt.font;
-            }
-
-            // Create from complete scratch to avoid ALL Valheim/ZenUI prefab quirks, masks, and layout groups
-            GameObject clearBtnObj = new GameObject("ClearAllButton");
-            clearBtnObj.transform.SetParent(panel, false);
-            clearBtnObj.transform.SetAsLastSibling(); // Ensure it draws on top of the background
-
-            RectTransform rt = clearBtnObj.AddComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0, 0);
-            rt.anchorMax = new Vector2(0, 0);
-            rt.pivot = new Vector2(0, 0);
-            rt.sizeDelta = new Vector2(140f, 40f);
-            
-            // Hardcode to 30 pixels from the left and 20 pixels from the bottom
-            rt.anchoredPosition = new Vector2(30f, 20f);
-
-            // Add LayoutElement with ignoreLayout to bypass any auto-layouts (Crucial for ZenUI compatibility)
-            LayoutElement layout = clearBtnObj.AddComponent<LayoutElement>();
-            layout.ignoreLayout = true;
-
-            // Apply stolen Valheim visuals
-            Image img = clearBtnObj.AddComponent<Image>();
-            img.type = Image.Type.Sliced;
-            if (btnSprite != null) img.sprite = btnSprite;
-            else img.color = new Color(0.15f, 0.15f, 0.15f, 1f); // Fallback to dark grey if sprite fails
-
-            // Make it clickable
-            Button btn = clearBtnObj.AddComponent<Button>();
-            btn.targetGraphic = img;
-            btn.onClick.AddListener(() => 
-            {
-                TrophyManager.PinnedTrophies.Clear();
-                ValheimMod.Instance.SavePinnedConfig();
-                ProgressList.UpdatePinnedUI();
-                
-                if (InventoryGui.instance != null)
-                {
-                    AccessTools.Method(typeof(InventoryGui), "UpdateTrophyList")?.Invoke(InventoryGui.instance, null);
-                }
-            });
-
-            // Add Text child
-            GameObject textObj = new GameObject("Text");
-            textObj.transform.SetParent(clearBtnObj.transform, false);
-            
-            RectTransform textRt = textObj.AddComponent<RectTransform>();
-            textRt.anchorMin = Vector2.zero;
-            textRt.anchorMax = Vector2.one;
-            textRt.sizeDelta = Vector2.zero;
-            textRt.anchoredPosition = Vector2.zero;
-
-            TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
-            txt.text = "Clear All";
-            if (btnFont != null) txt.font = btnFont;
-            txt.fontSize = 20;
-            txt.color = new Color(1f, 0.7f, 0.2f); // Valheim UI orange/gold
-            txt.alignment = TextAlignmentOptions.Center;
-            txt.enableWordWrapping = false;
         }
 
         private static void AddPinButtonToElement(GameObject uiElement, string trophyPrefabName)
