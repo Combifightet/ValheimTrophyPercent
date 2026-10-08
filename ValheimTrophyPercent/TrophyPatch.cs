@@ -111,64 +111,78 @@ namespace ValheimTrophyPercent
 
         private static void AddClearAllButton(Transform panel)
         {
-            Button[] buttons = panel.GetComponentsInChildren<Button>(true);
-            Button closeBtn = null;
+            if (panel.Find("ClearAllButton") != null) return;
+
+            // Try to find ANY existing button to steal its Valheim styling (Wood Sprite and Font)
+            Button templateBtn = panel.GetComponentInChildren<Button>(true);
+            Sprite btnSprite = null;
+            TMP_FontAsset btnFont = TrophyManager.GetValheimFont();
+
+            if (templateBtn != null)
+            {
+                Image templateImg = templateBtn.GetComponent<Image>();
+                if (templateImg != null) btnSprite = templateImg.sprite;
+                
+                TMP_Text templateTxt = templateBtn.GetComponentInChildren<TMP_Text>(true);
+                if (templateTxt != null) btnFont = templateTxt.font;
+            }
+
+            // Create from complete scratch to avoid ALL Valheim/ZenUI prefab quirks, masks, and layout groups
+            GameObject clearBtnObj = new GameObject("ClearAllButton");
+            clearBtnObj.transform.SetParent(panel, false);
+            clearBtnObj.transform.SetAsLastSibling(); // Ensure it draws on top of the background
+
+            RectTransform rt = clearBtnObj.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0, 0);
+            rt.anchorMax = new Vector2(0, 0);
+            rt.pivot = new Vector2(0, 0);
+            rt.sizeDelta = new Vector2(140f, 40f);
             
-            // Search for the Close button using naming conventions or text content
-            foreach (var b in buttons)
+            // Hardcode to 30 pixels from the left and 20 pixels from the bottom
+            rt.anchoredPosition = new Vector2(30f, 20f);
+
+            // Add LayoutElement with ignoreLayout to bypass any auto-layouts (Crucial for ZenUI compatibility)
+            LayoutElement layout = clearBtnObj.AddComponent<LayoutElement>();
+            layout.ignoreLayout = true;
+
+            // Apply stolen Valheim visuals
+            Image img = clearBtnObj.AddComponent<Image>();
+            img.type = Image.Type.Sliced;
+            if (btnSprite != null) img.sprite = btnSprite;
+            else img.color = new Color(0.15f, 0.15f, 0.15f, 1f); // Fallback to dark grey if sprite fails
+
+            // Make it clickable
+            Button btn = clearBtnObj.AddComponent<Button>();
+            btn.targetGraphic = img;
+            btn.onClick.AddListener(() => 
             {
-                TMP_Text btnText = b.GetComponentInChildren<TMP_Text>(true);
-                string txt = btnText != null ? btnText.text.ToLower() : "";
+                TrophyManager.PinnedTrophies.Clear();
+                ValheimMod.Instance.SavePinnedConfig();
+                ProgressList.UpdatePinnedUI();
                 
-                if (b.name.ToLower().Contains("close") || txt.Contains("close") || txt == Localization.instance.Localize("$button_close").ToLower())
+                if (InventoryGui.instance != null)
                 {
-                    closeBtn = b;
-                    break;
+                    AccessTools.Method(typeof(InventoryGui), "UpdateTrophyList")?.Invoke(InventoryGui.instance, null);
                 }
-            }
+            });
 
-            if (closeBtn != null)
-            {
-                // Grab the container the close button sits inside, so we are in the same formatting layout
-                Transform parent = closeBtn.transform.parent;
-                
-                // Only add the button once to prevent infinite instantiation 
-                if (parent.Find("ClearAllButton") != null) return;
+            // Add Text child
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(clearBtnObj.transform, false);
+            
+            RectTransform textRt = textObj.AddComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.sizeDelta = Vector2.zero;
+            textRt.anchoredPosition = Vector2.zero;
 
-                GameObject clearBtnObj = UnityEngine.Object.Instantiate(closeBtn.gameObject, parent);
-                clearBtnObj.name = "ClearAllButton";
-                
-                RectTransform rt = clearBtnObj.GetComponent<RectTransform>();
-                
-                // Bind strictly to the bottom left
-                rt.anchorMin = new Vector2(0, 0);
-                rt.anchorMax = new Vector2(0, 0);
-                rt.pivot = new Vector2(0, 0);
-                
-                // Extract the Y coordinate so it perfectly aligns with the Close button's row height
-                RectTransform closeRt = closeBtn.GetComponent<RectTransform>();
-                float yOffset = closeRt.anchorMin.y == 0 ? closeRt.anchoredPosition.y : 20f; 
-                rt.anchoredPosition = new Vector2(30, yOffset);
-                
-                TMP_Text txt = clearBtnObj.GetComponentInChildren<TMP_Text>();
-                if (txt != null) txt.text = "Clear All";
-                
-                Button btn = clearBtnObj.GetComponent<Button>();
-                btn.onClick.RemoveAllListeners(); // Remove the window closing logic
-                btn.onClick.AddListener(() => 
-                {
-                    // Clear data, save, and trigger UI rebuilds
-                    TrophyManager.PinnedTrophies.Clear();
-                    ValheimMod.Instance.SavePinnedConfig();
-                    ProgressList.UpdatePinnedUI();
-                    
-                    // Force the trophy menu to refresh its checkboxes visually instantly
-                    if (InventoryGui.instance != null)
-                    {
-                        AccessTools.Method(typeof(InventoryGui), "UpdateTrophyList")?.Invoke(InventoryGui.instance, null);
-                    }
-                });
-            }
+            TextMeshProUGUI txt = textObj.AddComponent<TextMeshProUGUI>();
+            txt.text = "Clear All";
+            if (btnFont != null) txt.font = btnFont;
+            txt.fontSize = 20;
+            txt.color = new Color(1f, 0.7f, 0.2f); // Valheim UI orange/gold
+            txt.alignment = TextAlignmentOptions.Center;
+            txt.enableWordWrapping = false;
         }
 
         private static void AddPinButtonToElement(GameObject uiElement, string trophyPrefabName)
