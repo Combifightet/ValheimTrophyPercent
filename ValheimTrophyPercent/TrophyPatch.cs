@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace ValheimTrophyPercent
 {
-    [HarmonyPatch(typeof(InventoryGui), "UpdateTrophyList")] 
+[HarmonyPatch(typeof(InventoryGui), "UpdateTrophyList")] 
     public static class InventoryGui_UpdateTrophyList_Patch
     {
         public static void Postfix(InventoryGui __instance, ref List<GameObject> ___m_trophyList, RectTransform ___m_trophieListRoot, GameObject ___m_trophieElementPrefab, float ___m_trophieListSpace)
@@ -23,11 +23,36 @@ namespace ValheimTrophyPercent
             Transform panel = __instance.m_trophiesPanel.transform;
 
             // 1. Append Percentage/Counter UI cleanly to the native title text instead of floating over trophies
-            TMP_Text topicText = panel.Find("Topic")?.GetComponent<TMP_Text>() ?? panel.Find("topic")?.GetComponent<TMP_Text>();
-            if (topicText != null)
+            string localizedTitle = Localization.instance.Localize("$inventory_trophies");
+            TMP_Text titleText = null;
+            
+            // Deep search to find the header text regardless of internal prefab naming
+            foreach (TMP_Text t in panel.GetComponentsInChildren<TMP_Text>(true))
             {
-                string baseText = Localization.instance.Localize("$inventory_trophies");
-                topicText.text = $"{baseText} <color=orange>({collected.Count}/{total})</color>";
+                string tName = t.name.ToLower();
+                if (tName == "topic" || tName == "title" || tName == "text_title")
+                {
+                    titleText = t;
+                    break;
+                }
+                if (t.text.StartsWith(localizedTitle) || t.text.StartsWith(localizedTitle.ToUpper()))
+                {
+                    titleText = t;
+                    break;
+                }
+            }
+
+            if (titleText != null)
+            {
+                // Disable wrapping so the appended text isn't cut off horizontally
+                titleText.overflowMode = TextOverflowModes.Overflow;
+                titleText.enableWordWrapping = false;
+                
+                string baseText = localizedTitle;
+                if (titleText.text.StartsWith(localizedTitle.ToUpper()))
+                    baseText = localizedTitle.ToUpper();
+
+                titleText.text = $"{baseText} <color=orange>({collected.Count}/{total})</color>";
             }
 
             // 1b. Inject the "Clear All" button in the bottom left
@@ -84,17 +109,18 @@ namespace ValheimTrophyPercent
             ___m_trophieListRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, finalSize + 100f);
         }
 
-private static void AddClearAllButton(Transform panel)
+        private static void AddClearAllButton(Transform panel)
         {
-            // Only add the button once to prevent infinite instantiation 
-            if (panel.Find("ClearAllButton") != null) return;
-
-            // Find the existing close button to clone its styling and hierarchy placement
             Button[] buttons = panel.GetComponentsInChildren<Button>(true);
             Button closeBtn = null;
+            
+            // Search for the Close button using naming conventions or text content
             foreach (var b in buttons)
             {
-                if (b.name.ToLower().Contains("close"))
+                TMP_Text btnText = b.GetComponentInChildren<TMP_Text>(true);
+                string txt = btnText != null ? btnText.text.ToLower() : "";
+                
+                if (b.name.ToLower().Contains("close") || txt.Contains("close") || txt == Localization.instance.Localize("$button_close").ToLower())
                 {
                     closeBtn = b;
                     break;
@@ -103,15 +129,26 @@ private static void AddClearAllButton(Transform panel)
 
             if (closeBtn != null)
             {
-                GameObject clearBtnObj = UnityEngine.Object.Instantiate(closeBtn.gameObject, panel);
+                // Grab the container the close button sits inside, so we are in the same formatting layout
+                Transform parent = closeBtn.transform.parent;
+                
+                // Only add the button once to prevent infinite instantiation 
+                if (parent.Find("ClearAllButton") != null) return;
+
+                GameObject clearBtnObj = UnityEngine.Object.Instantiate(closeBtn.gameObject, parent);
                 clearBtnObj.name = "ClearAllButton";
                 
                 RectTransform rt = clearBtnObj.GetComponent<RectTransform>();
                 
-                // Bind to bottom left and mirror the absolute X position for symmetry
+                // Bind strictly to the bottom left
                 rt.anchorMin = new Vector2(0, 0);
                 rt.anchorMax = new Vector2(0, 0);
-                rt.anchoredPosition = new Vector2(Mathf.Abs(rt.anchoredPosition.x), rt.anchoredPosition.y);
+                rt.pivot = new Vector2(0, 0);
+                
+                // Extract the Y coordinate so it perfectly aligns with the Close button's row height
+                RectTransform closeRt = closeBtn.GetComponent<RectTransform>();
+                float yOffset = closeRt.anchorMin.y == 0 ? closeRt.anchoredPosition.y : 20f; 
+                rt.anchoredPosition = new Vector2(30, yOffset);
                 
                 TMP_Text txt = clearBtnObj.GetComponentInChildren<TMP_Text>();
                 if (txt != null) txt.text = "Clear All";
@@ -128,7 +165,6 @@ private static void AddClearAllButton(Transform panel)
                     // Force the trophy menu to refresh its checkboxes visually instantly
                     if (InventoryGui.instance != null)
                     {
-                        // Use Harmony's AccessTools to invoke the private method
                         AccessTools.Method(typeof(InventoryGui), "UpdateTrophyList")?.Invoke(InventoryGui.instance, null);
                     }
                 });

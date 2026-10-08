@@ -23,7 +23,7 @@ namespace ValheimTrophyPercent
         public static Sprite Checkmark;
         public static GameObject DefaultTooltipPrefab;
 
-        // Searches memory for an authentic Valheim checkbox and steals its sprites
+// Searches memory for an authentic Valheim checkbox and steals its sprites
         public static void LoadToggleSprites()
         {
             if (CheckboxBackground == null || Checkmark == null)
@@ -37,13 +37,24 @@ namespace ValheimTrophyPercent
                         Image check = t.graphic as Image;
                         if (bg != null && check != null && bg.sprite != null && check.sprite != null)
                         {
-                            // Filter out the multiplayer map / public position toggles so we only grab the UI settings checkbox
-                            if (t.name.Contains("Map") || t.name.Contains("Public") || bg.sprite.name.Contains("map")) 
+                            string bgName = bg.sprite.name.ToLower();
+                            string checkName = check.sprite.name.ToLower();
+                            string toggleName = t.name.ToLower();
+
+                            // Aggressive filtering to exclude map, public, and circular radio buttons
+                            if (toggleName.Contains("map") || toggleName.Contains("public") || 
+                                bgName.Contains("map") || bgName.Contains("circle") || checkName.Contains("circle") || 
+                                bgName.Contains("radio") || checkName.Contains("radio")) 
                                 continue;
 
                             CheckboxBackground = bg.sprite;
                             Checkmark = check.sprite;
-                            break;
+                            
+                            // If we find the exact settings checkbox, break immediately to lock it in. 
+                            if (bgName.Contains("checkbox") && checkName.Contains("check"))
+                            {
+                                break;
+                            }
                         }
                     }
                 }
