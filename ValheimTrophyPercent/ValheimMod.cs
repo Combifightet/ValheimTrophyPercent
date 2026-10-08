@@ -13,7 +13,7 @@ namespace ValheimTrophyPercent
         // Define your mod credentials as constants
         const string pluginGUID = "Combifightet.TrophyPercent";
         const string pluginName = "Valheim Trophy Percent";
-        const string pluginVersion = "1.1.0";
+        const string pluginVersion = "1.2.0";
 
         // Create the Harmony instance using your GUID
         private readonly Harmony HarmonyInstance = new Harmony(pluginGUID);

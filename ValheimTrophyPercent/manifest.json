@@ -1,6 +1,6 @@
 {
 	"name": "TrophyPercent",
-	"version_number": "1.1.0",
+	"version_number": "1.2.0",
 	"website_url": "https://github.com/Combifightet/ValheimTrophyPercent",
 	"description": "Never again be uncertain when you will get the next trophy. \n\nThis mod allows you to see how many more enemies you need to kill to get the next trophy dropped.",
 	"dependencies": [
