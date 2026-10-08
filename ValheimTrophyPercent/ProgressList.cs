@@ -81,6 +81,12 @@ namespace ValheimTrophyPercent
 
             foreach (string trophyPrefab in TrophyManager.PinnedTrophies)
             {
+                // Check if the enemy has ever been killed by this character
+                if (TrophyManager.TrophyToEnemy.TryGetValue(trophyPrefab, out string enemyKey))
+                {
+                    if (TrophyManager.GetKillCount(enemyKey) <= 0) continue; // Hide the HUD element if zero kills
+                }
+
                 GameObject prefab = ObjectDB.instance.GetItemPrefab(trophyPrefab);
                 if (prefab == null) continue;
 
