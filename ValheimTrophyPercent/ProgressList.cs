@@ -22,6 +22,11 @@ namespace ValheimTrophyPercent
                 
                 Container = PinnedPanel.AddComponent<RectTransform>();
                 
+                // Add a CanvasGroup to make the overlay completely transparent to mouse clicks
+                CanvasGroup group = PinnedPanel.AddComponent<CanvasGroup>();
+                group.interactable = false;
+                group.blocksRaycasts = false;
+                
                 // Anchor to Top-Right of the screen
                 Container.anchorMin = new Vector2(1, 1);
                 Container.anchorMax = new Vector2(1, 1);
@@ -170,6 +175,7 @@ namespace ValheimTrophyPercent
             text.fontSize = 18;
             text.color = Color.white;
             text.alignment = TextAlignmentOptions.Right;
+            text.raycastTarget = false; // Disable Raycasts on text
             text.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 30);
             textObj.SetActive(true);
 
@@ -179,6 +185,7 @@ namespace ValheimTrophyPercent
             Image img = iconObj.AddComponent<Image>();
             img.sprite = icon;
             img.preserveAspect = true;
+            img.raycastTarget = false; // Disable Raycasts on image
             iconObj.GetComponent<RectTransform>().sizeDelta = new Vector2(25, 25);
         }
     }

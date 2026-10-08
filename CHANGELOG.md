@@ -1,11 +1,16 @@
+## v1.2.0
+- Rebuilt trophy dialog layout to include categorized "Biome" headers for cleaner organization.
+- Added dynamic line wrapping to the menu so excessive trophies no longer clip off-screen.
+- Fixed the HUD progress overlay blocking map interactions by configuring it to pass through all mouse clicks.
+
 ## v1.1.0
 - Added `~` tilde prefix for estimated/predicted kill counts on the HUD
 - Added configuration format example to the config file description
+- Added adaptive kill-detection so pinned trophies will intelligently hide themselves if you log into a character with 0 kills for that creature.
 - Fixed completion text overlapping checkboxes by appending progress directly to the window title
 - Fixed pin toggle button using the multiplayer map icon instead of the settings checkbox _(not realy tested)_
 - Fixed kill counter failing to reset in multiplayer when drops are uncollected or after death _(not realy tested)_
 - Improved HUD display by stripping redundant "Trophy" text from creature names
-- Automatically hiding tropphy goals for not yet killed enemies
 
 ## v1.0.0
 - Full release

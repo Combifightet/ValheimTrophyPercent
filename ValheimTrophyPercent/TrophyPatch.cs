@@ -3,9 +3,19 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ValheimTrophyPercent
 {
+    // Container object for re-sorting the UI elements 
+    public class TrophyItemData
+    {
+        public GameObject GameObject;
+        public string PrefabName;
+        public int X;
+        public int Y;
+    }
+
     [HarmonyPatch(typeof(InventoryGui), "UpdateTrophyList")] 
     public static class InventoryGui_UpdateTrophyList_Patch
     {
@@ -55,17 +65,27 @@ namespace ValheimTrophyPercent
                 titleText.text = $"{baseText} <color=orange>({collected.Count}/{total})</color>";
             }
 
-            // 2. Add Toggle Buttons to EXISTING collected trophies
+            List<TrophyItemData> allTrophies = new List<TrophyItemData>();
+
+            // 2. Add Toggle Buttons to EXISTING collected trophies and extract sorting data
             for (int i = 0; i < collected.Count; i++)
             {
                 GameObject uiElement = ___m_trophyList[i];
                 string trophyPrefabName = collected[i];
+                
+                GameObject prefab = ObjectDB.instance.GetItemPrefab(trophyPrefabName);
+                if (prefab != null)
+                {
+                    ItemDrop drop = prefab.GetComponent<ItemDrop>();
+                    Vector2Int pos = drop.m_itemData.m_shared.m_trophyPos;
+                    allTrophies.Add(new TrophyItemData { GameObject = uiElement, PrefabName = trophyPrefabName, X = pos.x, Y = pos.y });
+                }
+
                 AddPinButtonToElement(uiElement, trophyPrefabName);
             }
 
             // 3. Add "Killed but Missing" Trophies
             List<string> missing = TrophyManager.GetKilledButMissingTrophies();
-            float lowestY = 0f;
 
             foreach (string missingTrophy in missing)
             {
@@ -76,34 +96,106 @@ namespace ValheimTrophyPercent
                 GameObject gameObject = UnityEngine.Object.Instantiate(___m_trophieElementPrefab, ___m_trophieListRoot);
                 gameObject.SetActive(true);
                 
-                RectTransform rectTransform = gameObject.transform as RectTransform;
-                
-                // Position logic based on vanilla grid
-                rectTransform.anchoredPosition = new Vector2(
-                    (float)component.m_itemData.m_shared.m_trophyPos.x * ___m_trophieListSpace, 
-                    (float)component.m_itemData.m_shared.m_trophyPos.y * -___m_trophieListSpace
-                );
-                
-                lowestY = Mathf.Min(lowestY, rectTransform.anchoredPosition.y - ___m_trophieListSpace);
                 string locName = Localization.instance.Localize(component.m_itemData.m_shared.m_name);
                 
                 // Set Icon and tint it dark/gray to indicate it's missing
-                Image iconImg = rectTransform.Find("icon_bkg/icon").GetComponent<Image>();
+                Image iconImg = gameObject.transform.Find("icon_bkg/icon").GetComponent<Image>();
                 iconImg.sprite = component.m_itemData.GetIcon();
                 iconImg.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
 
-                rectTransform.Find("name").GetComponent<TMP_Text>().text = locName + " <color=red>(Missing)</color>";
-                rectTransform.Find("description").GetComponent<TMP_Text>().text = "You have slain this beast, but the trophy eludes you...";
+                gameObject.transform.Find("name").GetComponent<TMP_Text>().text = locName + " <color=red>(Missing)</color>";
+                gameObject.transform.Find("description").GetComponent<TMP_Text>().text = "You have slain this beast, but the trophy eludes you...";
 
                 ___m_trophyList.Add(gameObject);
-
-                // Add pin button to missing trophies as well
                 AddPinButtonToElement(gameObject, missingTrophy);
+
+                Vector2Int pos = component.m_itemData.m_shared.m_trophyPos;
+                allTrophies.Add(new TrophyItemData { GameObject = gameObject, PrefabName = missingTrophy, X = pos.x, Y = pos.y });
             }
 
-            // Resize the container to fit the newly added elements
-            float finalSize = Mathf.Max(0f, -lowestY);
-            ___m_trophieListRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, finalSize + 100f);
+            // 4. Custom Grid & Wrapping Layout
+            // Remove any dynamically created headers from a previous opening
+            foreach (Transform child in ___m_trophieListRoot)
+            {
+                if (child.name == "BiomeHeader") UnityEngine.Object.Destroy(child.gameObject);
+            }
+
+            // Group the items by their internal Y-axis value (which Valheim uses to separate biomes)
+            var groupedTrophies = allTrophies.GroupBy(t => t.Y).OrderBy(g => g.Key);
+            
+            float currentY = -20f; 
+            float elementSpace = ___m_trophieListSpace;
+            // Provide a sensible fallback if the rect hasn't generated its physical boundaries yet
+            float maxWidth = ___m_trophieListRoot.rect.width > 100f ? ___m_trophieListRoot.rect.width - 20f : 650f;
+
+            foreach (var group in groupedTrophies)
+            {
+                CreateBiomeHeader(___m_trophieListRoot, GetBiomeName(group.Key), currentY);
+                currentY -= 40f; 
+                
+                float currentX = 0f;
+                // Lay out elements left-to-right based on internal X sorting
+                foreach (var item in group.OrderBy(t => t.X))
+                {
+                    // Detect if the trophy will go out of bounds and wrap it to a new row
+                    if (currentX + elementSpace > maxWidth)
+                    {
+                        currentX = 0f;
+                        currentY -= elementSpace;
+                    }
+                    
+                    RectTransform rt = item.GameObject.transform as RectTransform;
+                    rt.anchoredPosition = new Vector2(currentX, currentY);
+                    
+                    currentX += elementSpace;
+                }
+                
+                // Finalize row spacing before moving to the next biome block
+                currentY -= elementSpace; 
+            }
+
+            // Resize the container to fit the dynamically rebuilt elements
+            float finalSize = Mathf.Abs(currentY) + 100f;
+            ___m_trophieListRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, finalSize);
+        }
+
+        private static string GetBiomeName(int y)
+        {
+            switch (y)
+            {
+                case 0: return "Meadows";
+                case 1: return "Black Forest";
+                case 2: return "Swamp";
+                case 3: return "Mountains";
+                case 4: return "Plains";
+                case 5: return "Ocean";
+                case 6: return "Mistlands";
+                case 7: return "Ashlands";
+                case 8: return "Deep North";
+                default: return "Events & Other";
+            }
+        }
+
+        private static void CreateBiomeHeader(RectTransform root, string title, float yPos)
+        {
+            GameObject headerObj = new GameObject("BiomeHeader");
+            headerObj.transform.SetParent(root, false);
+            
+            RectTransform rt = headerObj.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0, 1);
+            rt.anchorMax = new Vector2(1, 1);
+            rt.pivot = new Vector2(0, 1);
+            
+            // Indent the title slightly
+            rt.anchoredPosition = new Vector2(10f, yPos);
+            rt.sizeDelta = new Vector2(0, 30);
+            
+            TextMeshProUGUI txt = headerObj.AddComponent<TextMeshProUGUI>();
+            txt.text = title;
+            txt.font = TrophyManager.GetValheimFont();
+            txt.fontSize = 24;
+            txt.color = new Color(1f, 0.7f, 0.2f);
+            txt.alignment = TextAlignmentOptions.Left;
         }
 
         private static void AddPinButtonToElement(GameObject uiElement, string trophyPrefabName)
