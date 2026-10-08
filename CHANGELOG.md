@@ -1,11 +1,11 @@
 ## v1.1.0
-- Added "Clear All" button to the bottom left of the trophy dialog
 - Added `~` tilde prefix for estimated/predicted kill counts on the HUD
 - Added configuration format example to the config file description
-- Fixed pin toggle button using the multiplayer map icon instead of the settings checkbox
 - Fixed completion text overlapping checkboxes by appending progress directly to the window title
-- Fixed kill counter failing to reset in multiplayer when drops are uncollected or after death
+- Fixed pin toggle button using the multiplayer map icon instead of the settings checkbox _(not realy tested)_
+- Fixed kill counter failing to reset in multiplayer when drops are uncollected or after death _(not realy tested)_
 - Improved HUD display by stripping redundant "Trophy" text from creature names
+- Automatically hiding tropphy goals for not yet killed enemies
 
 ## v1.0.0
 - Full release
